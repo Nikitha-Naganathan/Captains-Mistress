@@ -27,6 +27,9 @@ var falling_disc_position = Vector2.ZERO
 var falling_disc_player = 0
 var falling_disc_target = Vector2.ZERO
 var falling_disc_tween: Tween
+var start_screen: Control
+var start_button: Button
+var game_started = false
 
 var drop_sound: AudioStreamPlayer
 var win_sound: AudioStreamPlayer
@@ -38,8 +41,8 @@ func _ready():
 	create_turn_label()
 	create_win_ui()
 	create_sound_players()
-	play_turn_animation()
-
+	create_start_screen()
+	turn_label.visible = false
 
 func initialize_board():
 	board.clear()
@@ -60,7 +63,7 @@ func find_empty_row(column):
 
 
 func drop_disc(column):
-	if game_over or is_animating:
+	if not game_started or game_over or is_animating:
 		return
 
 	if column < 0 or column >= COLS:
@@ -475,6 +478,64 @@ func create_sound_players():
 	click_sound.stream = load("res://Assets/Audio/click.wav")
 	add_child(click_sound)
 
+func create_start_screen():
+	start_screen = Control.new()
+	start_screen.name = "StartScreen"
+	start_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	start_screen.z_index = 100
+	add_child(start_screen)
+
+	var background = ColorRect.new()
+	background.color = Color("#080A10")
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_STOP
+	start_screen.add_child(background)
+
+	var glow = Label.new()
+	glow.text = "CONNECT FOUR"
+	glow.position = Vector2(240, 170)
+	glow.size = Vector2(800, 130)
+	glow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	glow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	glow.add_theme_font_size_override("font_size", 82)
+	glow.add_theme_color_override("font_color", Color(0.0, 0.85, 1.0, 0.25))
+	start_screen.add_child(glow)
+
+	var title = Label.new()
+	title.text = "CONNECT FOUR"
+	title.position = Vector2(240, 160)
+	title.size = Vector2(800, 130)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 82)
+	title.add_theme_color_override("font_color", Color("#E8F1FF"))
+	start_screen.add_child(title)
+	
+	var subtitle = Label.new()
+	subtitle.text = "THE ARCADE CLASSIC"
+	subtitle.position = Vector2(340, 300)
+	subtitle.size = Vector2(600, 45)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.add_theme_font_size_override("font_size", 22)
+	subtitle.add_theme_color_override("font_color", Color("#00D9FF"))
+	start_screen.add_child(subtitle)
+
+	start_button = Button.new()
+	start_button.text = "PLAY"
+	start_button.position = Vector2(500, 410)
+	start_button.size = Vector2(280, 80)
+	start_button.add_theme_font_size_override("font_size", 32)
+	start_button.add_theme_color_override("font_color", Color("#E8F1FF"))
+	start_button.add_theme_color_override("font_hover_color", Color("#00D9FF"))
+	start_button.pressed.connect(_start_game)
+	start_screen.add_child(start_button)
+
+func _start_game():
+	game_started = true
+	start_screen.visible = false
+	turn_label.visible = true
+	play_turn_animation()
+
 func _process(delta):
 	if not confetti.is_empty():
 		confetti_time += delta
@@ -535,343 +596,157 @@ func _draw():
 
 	draw_rect(
 		Rect2(Vector2.ZERO, screen_size),
-		Color("#0B0B10"),
+		Color("#080A10"),
 		true
 	)
 
-	var glow_center = Vector2(screen_size.x / 2.0, 350)
+	var glow_center = Vector2(640, 360)
 
-	for i in range(8, 0, -1):
-		var radius = 380.0 + i * 25.0
-		var alpha = 0.012 * (9 - i)
-
+	for i in range(7, 0, -1):
 		draw_circle(
 			glow_center,
-			radius,
-			Color(0.0, 0.55, 1.0, alpha)
+			260.0 + i * 35.0,
+			Color(0.0, 0.35, 0.65, 0.012)
 		)
 
-	for y in range(40, int(screen_size.y), 40):
+	for y in range(80, 700, 80):
 		draw_line(
-			Vector2(0, y),
-			Vector2(screen_size.x, y),
-			Color(0.0, 0.5, 1.0, 0.025),
+			Vector2(80, y),
+			Vector2(1200, y),
+			Color(0.0, 0.5, 0.8, 0.018),
 			1.0
 		)
-
-	for x in range(40, int(screen_size.x), 40):
-		draw_line(
-			Vector2(x, 0),
-			Vector2(x, screen_size.y),
-			Color(0.0, 0.5, 1.0, 0.02),
-			1.0
-		)
-
-	var cabinet = PackedVector2Array([
-	Vector2(215, 25),
-	Vector2(1065, 25),
-	Vector2(1095, 650),
-	Vector2(1035, 695),
-	Vector2(245, 695),
-	Vector2(185, 650)
-	])
 
 	var cabinet_shadow = PackedVector2Array([
-	Vector2(225, 38),
-	Vector2(1075, 38),
-	Vector2(1108, 660),
-	Vector2(1045, 705),
-	Vector2(235, 705),
-	Vector2(175, 660)
+		Vector2(255, 55),
+		Vector2(1025, 55),
+		Vector2(1060, 650),
+		Vector2(1010, 690),
+		Vector2(270, 690),
+		Vector2(220, 650)
 	])
 
 	draw_colored_polygon(
-	cabinet_shadow,
-	Color(0.0, 0.0, 0.0, 0.7)
+		cabinet_shadow,
+		Color(0.0, 0.0, 0.0, 0.65)
 	)
 
+	var cabinet = PackedVector2Array([
+		Vector2(245, 45),
+		Vector2(1035, 45),
+		Vector2(1060, 635),
+		Vector2(1010, 675),
+		Vector2(270, 675),
+		Vector2(220, 635)
+	])
+
 	draw_colored_polygon(
-	cabinet,
-	Color("#252833")
+		cabinet,
+		Color("#20232C")
 	)
 
 	var inner_cabinet = PackedVector2Array([
-	Vector2(225, 40),
-	Vector2(1055, 40),
-	Vector2(1075, 640),
-	Vector2(1020, 680),
-	Vector2(260, 680),
-	Vector2(205, 640)
+		Vector2(260, 60),
+		Vector2(1020, 60),
+		Vector2(1040, 625),
+		Vector2(995, 655),
+		Vector2(285, 655),
+		Vector2(240, 625)
 	])
 
 	draw_colored_polygon(
-	inner_cabinet,
-	Color("#171A3A")
+		inner_cabinet,
+		Color("#111522")
 	)
-
-	draw_polyline(
-	PackedVector2Array([
-		Vector2(215, 25),
-		Vector2(1065, 25),
-		Vector2(1095, 650),
-		Vector2(1035, 695),
-		Vector2(245, 695),
-		Vector2(185, 650),
-		Vector2(215, 25)
-	]),
-	Color("#00D9FF"),
-	3.0
-)
-
-	draw_line(
-		Vector2(205, 35),
-		Vector2(1075, 35),
-		Color("#00D9FF"),
-		3.0
-	)
-
-	draw_line(
-		Vector2(205, 39),
-		Vector2(1075, 39),
-		Color(0.0, 0.85, 1.0, 0.25),
-		8.0
-	)
-
 
 	draw_polyline(
 		PackedVector2Array([
-			Vector2(205, 45),
-			Vector2(225, 45),
-			Vector2(225, 620),
-			Vector2(205, 650)
+			Vector2(245, 45),
+			Vector2(1035, 45),
+			Vector2(1060, 635),
+			Vector2(1010, 675),
+			Vector2(270, 675),
+			Vector2(220, 635),
+			Vector2(245, 45)
 		]),
-		Color("#00D9FF"),
-		3.0
+		Color("#00AFCF"),
+		2.0
 	)
 
-	draw_polyline(
-	PackedVector2Array([
-		Vector2(1055, 45),
-		Vector2(1075, 45),
-		Vector2(1075, 650),
-		Vector2(1055, 620)
-	]),
-	Color("#00D9FF"),
-	3.0
-	)
-	var marquee = PackedVector2Array([
-	Vector2(215, 50),
-	Vector2(1065, 50),
-	Vector2(1035, 95),
-	Vector2(245, 95)
-	])
-
-	draw_colored_polygon(
-	marquee,
-	Color("#0B0B10")
-	)
-
-	draw_polyline(
-	PackedVector2Array([
-		Vector2(215, 50),
-		Vector2(1065, 50),
-		Vector2(1035, 95),
-		Vector2(245, 95),
-		Vector2(215, 50)
-	]),
-	Color("#00D9FF"),
-	2.5
-	)
-
-	draw_line(
-	Vector2(245, 91),
-	Vector2(1035, 91),
-	Color(0.0, 0.85, 1.0, 0.35),
-	4.0
-	)
-
-	draw_circle(
-	Vector2(230, 72),
-	6,
-	Color("#00D9FF")
-	)
-
-	draw_circle(
-	Vector2(1050, 72),
-	6,
-	Color("#00D9FF")
-	)
-	
-	draw_line(
-	Vector2(280, 65),
-	Vector2(1000, 65),
-	Color(0.0, 0.85, 1.0, 0.15),
-	10.0
-)
-
-	draw_line(
-	Vector2(300, 65),
-	Vector2(980, 65),
-	Color("#00D9FF"),
-	2.0
-	)
-
-	for x in range(320, 961, 80):
-		draw_circle(
-		Vector2(x, 65),
-		3.0,
-		Color("#E8F1FF")
-	)
-
-	draw_line(
-	Vector2(270, 82),
-	Vector2(1010, 82),
-	Color(0.0, 0.85, 1.0, 0.08),
-	4.0
-	)
-	
-	var screen_frame = Rect2(
-	Vector2(345, 95),
-	Vector2(590, 525)
+	var marquee = Rect2(
+		Vector2(285, 70),
+		Vector2(710, 70)
 	)
 
 	draw_rect(
-		screen_frame,
-		Color("#0B0B10"),
+		marquee,
+		Color("#090C14"),
 		true
 	)
 
 	draw_rect(
 		Rect2(
-			screen_frame.position + Vector2(6, 6),
-			screen_frame.size - Vector2(12, 12)
+			marquee.position,
+			marquee.size
 		),
-		Color("#171A3A"),
-		true
-	)
-
-	draw_rect(
-		Rect2(
-			screen_frame.position + Vector2(12, 12),
-			screen_frame.size - Vector2(24, 24)
-		),
-		Color("#080A12"),
-		true
-	)
-
-	draw_rect(
-		Rect2(
-			screen_frame.position + Vector2(12, 12),
-			screen_frame.size - Vector2(24, 24)
-		),
-		Color("#00D9FF"),
+		Color("#273044"),
 		false,
 		2.0
 	)
 
 	draw_line(
-		Vector2(205, 660),
-		Vector2(1075, 660),
-		Color("#00D9FF"),
-		3.0
-	)
-
-	draw_line(
-		Vector2(205, 675),
-		Vector2(1075, 675),
-		Color(0.0, 0.85, 1.0, 0.3),
+		Vector2(305, 125),
+		Vector2(975, 125),
+		Color(0.0, 0.75, 0.95, 0.35),
 		2.0
 	)
-	
-	var control_panel = PackedVector2Array([
-	Vector2(205, 635),
-	Vector2(1075, 635),
-	Vector2(1025, 690),
-	Vector2(255, 690)
-	])
 
-	draw_colored_polygon(
-	control_panel,
-	Color("#252833")
-	)
-
-	draw_polyline(
-	PackedVector2Array([
-		Vector2(205, 635),
-		Vector2(1075, 635),
-		Vector2(1025, 690),
-		Vector2(255, 690),
-		Vector2(205, 635)
-	]),
-	Color("#00D9FF"),
-	3.0
+	draw_circle(
+		Vector2(315, 92),
+		4,
+		Color("#00D9FF")
 	)
 
 	draw_circle(
-	Vector2(400, 662),
-	18,
-	Color("#080A12")
+		Vector2(965, 92),
+		4,
+		Color("#00D9FF")
 	)
 
-	draw_circle(
-	Vector2(400, 662),
-	13,
-	Color("#E52323")
+	var screen_bezel = Rect2(
+		Vector2(335, 145),
+		Vector2(610, 480)
 	)
 
-	draw_circle(
-	Vector2(445, 662),
-	18,
-	Color("#080A12")
+	draw_rect(
+		screen_bezel,
+		Color("#05070C"),
+		true
 	)
 
-	draw_circle(
-	Vector2(445, 662),
-	13,
-	Color("#FFD21F")
+	draw_rect(
+		Rect2(
+			screen_bezel.position + Vector2(8, 8),
+			screen_bezel.size - Vector2(16, 16)
+		),
+		Color("#171B2A"),
+		true
 	)
 
-	draw_circle(
-	Vector2(835, 662),
-	18,
-	Color("#080A12")
-	)
-
-	draw_circle(
-	Vector2(835, 662),
-	13,
-	Color("#E52323")
-	)
-
-	draw_circle(
-	Vector2(880, 662),
-	18,
-	Color("#080A12")
-	)
-
-	draw_circle(
-	Vector2(880, 662),
-	13,
-	Color("#FFD21F")
+	draw_rect(
+		Rect2(
+			screen_bezel.position + Vector2(13, 13),
+			screen_bezel.size - Vector2(26, 26)
+		),
+		Color("#0A0D16"),
+		true
 	)
 
 	draw_line(
-	Vector2(620, 670),
-	Vector2(620, 645),
-	Color("#080A12"),
-	10.0
-	)
-
-	draw_circle(
-	Vector2(620, 640),
-	18,
-	Color("#00D9FF")
-	)
-
-	draw_circle(
-	Vector2(620, 640),
-	10,
-	Color("#171A3A")
+		Vector2(350, 150),
+		Vector2(930, 150),
+		Color(0.0, 0.85, 1.0, 0.55),
+		2.0
 	)
 
 	for row in range(ROWS):
@@ -882,8 +757,11 @@ func _draw():
 			)
 
 			draw_rect(
-				Rect2(cell_position, Vector2(CELL_SIZE, CELL_SIZE)),
-				Color("#171A3A"),
+				Rect2(
+					cell_position,
+					Vector2(CELL_SIZE, CELL_SIZE)
+				),
+				Color("#151A2B"),
 				true
 			)
 
@@ -895,27 +773,27 @@ func _draw():
 			draw_circle(
 				center,
 				DISC_RADIUS + 4,
-				Color(0.0, 0.0, 0.0, 0.35)
+				Color("#070910")
 			)
 
 			if board[row][col] == 0:
 				draw_circle(
 					center,
 					DISC_RADIUS,
-					Color("#080A12")
+					Color("#090C15")
 				)
 
 				draw_circle(
 					center,
-					DISC_RADIUS - 4,
-					Color("#101321")
+					DISC_RADIUS - 5,
+					Color("#111624")
 				)
 
 			elif board[row][col] == 1:
 				draw_circle(
 					center,
-					DISC_RADIUS + 7,
-					Color(1.0, 0.05, 0.05, 0.12)
+					DISC_RADIUS + 6,
+					Color(0.9, 0.05, 0.05, 0.10)
 				)
 
 				draw_circle(
@@ -926,15 +804,15 @@ func _draw():
 
 				draw_circle(
 					center - Vector2(8, 8),
-					7,
-					Color(1.0, 0.45, 0.45, 0.7)
+					6,
+					Color("#FF7777")
 				)
 
 			elif board[row][col] == 2:
 				draw_circle(
 					center,
-					DISC_RADIUS + 7,
-					Color(1.0, 0.75, 0.0, 0.12)
+					DISC_RADIUS + 6,
+					Color(1.0, 0.75, 0.0, 0.10)
 				)
 
 				draw_circle(
@@ -945,8 +823,8 @@ func _draw():
 
 				draw_circle(
 					center - Vector2(8, 8),
-					7,
-					Color(1.0, 0.95, 0.55, 0.8)
+					6,
+					Color("#FFF29A")
 				)
 
 	draw_rect(
@@ -954,9 +832,106 @@ func _draw():
 			BOARD_OFFSET,
 			Vector2(COLS * CELL_SIZE, ROWS * CELL_SIZE)
 		),
-		Color("#00D9FF"),
+		Color("#273044"),
 		false,
 		2.0
+	)
+
+	var control_panel = PackedVector2Array([
+		Vector2(220, 625),
+		Vector2(1060, 625),
+		Vector2(1010, 675),
+		Vector2(270, 675)
+	])
+
+	draw_colored_polygon(
+		control_panel,
+		Color("#252A35")
+	)
+	draw_polyline(
+		PackedVector2Array([
+			Vector2(220, 625),
+			Vector2(1060, 625),
+			Vector2(1010, 675),
+			Vector2(270, 675),
+			Vector2(220, 625)
+		]),
+		Color("#00AFCF"),
+		2.0
+	)
+
+	draw_circle(
+		Vector2(410, 650),
+		17,
+		Color("#090B12")
+	)
+
+	draw_circle(
+		Vector2(410, 650),
+		12,
+		Color("#E52323")
+	)
+
+	draw_circle(
+		Vector2(450, 650),
+		17,
+		Color("#090B12")
+	)
+
+	draw_circle(
+		Vector2(450, 650),
+		12,
+		Color("#FFD21F")
+	)
+
+	draw_circle(
+		Vector2(870, 650),
+		17,
+		Color("#090B12")
+	)
+
+	draw_circle(
+		Vector2(870, 650),
+		12,
+		Color("#E52323")
+	)
+
+	draw_circle(
+		Vector2(910, 650),
+		17,
+		Color("#090B12")
+	)
+
+	draw_circle(
+		Vector2(910, 650),
+		12,
+		Color("#FFD21F")
+	)
+
+	draw_line(
+		Vector2(640, 660),
+		Vector2(640, 638),
+		Color("#090B12"),
+		9.0
+	)
+
+	draw_circle(
+		Vector2(640, 632),
+		17,
+		Color("#00AFCF")
+	)
+
+	draw_circle(
+		Vector2(640, 632),
+		10,
+		Color("#182033")
+	)
+
+	draw_line(
+		Vector2(250, 665),
+		Vector2(1030, 665),
+		Color(0.0, 0.75, 0.95, 0.18),
+		1.0
 	)
 
 	if is_animating:
@@ -965,16 +940,16 @@ func _draw():
 		if falling_disc_player == 1:
 			draw_circle(
 				falling_disc_position,
-				DISC_RADIUS + 7,
-				Color(1.0, 0.05, 0.05, 0.12)
+				DISC_RADIUS + 6,
+				Color(0.9, 0.05, 0.05, 0.10)
 			)
 
 			falling_color = Color("#E52323")
 		else:
 			draw_circle(
 				falling_disc_position,
-				DISC_RADIUS + 7,
-				Color(1.0, 0.75, 0.0, 0.12)
+				DISC_RADIUS + 6,
+				Color(1.0, 0.75, 0.0, 0.10)
 			)
 
 			falling_color = Color("#FFD21F")
