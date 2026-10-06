@@ -761,25 +761,25 @@ func create_start_screen():
 	start_screen.add_child(background)
 
 	var glow = Label.new()
-	glow.text = "CONNECT FOUR"
+	glow.text = "CAPTAIN'S MISTRESS"
 	var curvey_font = load("res://Assets/Fonts/Font2.ttf")
 	glow.add_theme_font_override("font", curvey_font)
-	glow.position = Vector2(240, 170)
+	glow.position = Vector2(160, 170)
 	glow.size = Vector2(800, 130)
 	glow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	glow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	glow.add_theme_font_size_override("font_size", 72)
+	glow.add_theme_font_size_override("font_size", 60)
 	glow.add_theme_color_override("font_color", Color(0.0, 0.85, 1.0, 0.25))
 	start_screen.add_child(glow)
 
 	var title = Label.new()
-	title.text = "CONNECT FOUR"
+	title.text = "CAPTAIN'S MISTRESS"
 	title.add_theme_font_override("font", curvey_font)
-	title.position = Vector2(240, 160)
+	title.position = Vector2(160, 160)
 	title.size = Vector2(800, 130)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 72)
+	title.add_theme_font_size_override("font_size", 60)
 	title.add_theme_color_override("font_color", Color("#E8F1FF"))
 	start_screen.add_child(title)
 	
@@ -796,7 +796,7 @@ func create_start_screen():
 	start_button = Button.new()
 	start_button.text = "PLAY"
 	start_button.add_theme_font_override("font", curvey_font)
-	start_button.position = Vector2(500, 410)
+	start_button.position = Vector2(490, 390)
 	start_button.size = Vector2(280, 80)
 	var normal_style = StyleBoxFlat.new()
 	normal_style.bg_color = Color("#171A3A")
