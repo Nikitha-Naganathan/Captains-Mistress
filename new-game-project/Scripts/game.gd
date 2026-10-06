@@ -1306,6 +1306,10 @@ func _input(event):
 		if event.keycode >= KEY_1 and event.keycode <= KEY_7:
 			var column = event.keycode - KEY_1
 			drop_disc(column)
+	
+		elif event.keycode >= KEY_KP_1 and event.keycode <= KEY_KP_7:
+			var column = event.keycode - KEY_KP_1
+			drop_disc(column)
 
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
