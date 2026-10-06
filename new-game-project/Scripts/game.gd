@@ -9,6 +9,7 @@ const DISC_RADIUS = 30
 const CONFETTI_COUNT = 80
 const CONFETTI_DURATION = 3.0
 const CONFETTI_GRAVITY = 500.0
+const MENU_BG = Color("#080A10")
 
 var board = []
 
@@ -39,6 +40,14 @@ var game_started = false
 var rules_screen: Control
 var rules_button: Button
 var start_info_screen: Control
+
+var game_mode_screen: Control
+var game_mode_button: Button
+var computer_mode = false
+var computer_difficulty = ""
+var computer_thinking = false
+var difficulty_screen: Control
+
 var neon_orb: ColorRect
 var neon_orb_glow: ColorRect
 var neon_orb_core: ColorRect
@@ -65,8 +74,43 @@ func _ready():
 	create_sound_players()
 	create_start_screen()
 	create_rules_screen()
+	create_game_mode_screen()
+	create_difficulty_screen()
 	create_start_info_screen()
 	turn_label.visible = false
+	game_started = false
+
+func add_menu_stars(screen):
+	var stars = [
+		Vector2(70, 85), Vector2(210, 125),
+		Vector2(390, 70), Vector2(520, 105),
+		Vector2(680, 65), Vector2(820, 115),
+		Vector2(980, 75), Vector2(1130, 120),
+
+		Vector2(110, 250), Vector2(250, 330),
+		Vector2(1030, 280), Vector2(1160, 350),
+
+		Vector2(80, 470), Vector2(190, 540),
+		Vector2(1080, 480), Vector2(1180, 540),
+
+		Vector2(250, 650), Vector2(390, 600),
+		Vector2(520, 665), Vector2(680, 620),
+		Vector2(820, 660), Vector2(960, 600),
+		Vector2(1110, 650)
+	]
+
+	for star_pos in stars:
+		var star = Label.new()
+		star.text = "✦"
+		star.position = star_pos
+		star.size = Vector2(30, 30)
+		star.add_theme_font_size_override("font_size", 22)
+		star.add_theme_color_override("font_color", Color("#00E5FF"))
+		star.add_theme_color_override("font_outline_color", Color("#00E5FF"))
+		star.add_theme_constant_override("outline_size", 6)
+		star.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		star.z_index = 1
+		screen.add_child(star)
 
 func create_shutter():
 	shutter = Control.new()
@@ -175,7 +219,8 @@ func find_empty_row(column):
 func drop_disc(column):
 	if not game_started or game_over or is_animating:
 		return
-
+	if computer_mode and current_player == 2 and not computer_thinking:
+		return
 	if column < 0 or column >= COLS:
 		return
 
@@ -236,7 +281,83 @@ func finish_disc_drop(row, column):
 		return
 
 	switch_player()
+
+	if computer_mode and current_player == 2:
+		computer_take_turn()
+	else:
+		play_turn_animation()
+
+func computer_take_turn():
+	if game_over or is_animating or computer_thinking:
+		return
+
+	computer_thinking = true
 	play_turn_animation()
+	
+	await get_tree().create_timer(0.6).timeout
+
+	var column = get_computer_move()
+
+	drop_disc(column)
+	computer_thinking = false
+
+func get_computer_move():
+	if computer_difficulty == "Easy":
+		return get_random_valid_column()
+
+	if computer_difficulty == "Medium":
+		return get_medium_move()
+
+	if computer_difficulty == "Hard":
+		return get_hard_move()
+
+	return get_random_valid_column()
+
+func get_random_valid_column():
+	var valid_columns = []
+
+	for col in range(COLS):
+		if find_empty_row(col) != -1:
+			valid_columns.append(col)
+
+	return valid_columns[randi() % valid_columns.size()]
+
+func get_medium_move():
+	var winning_move = find_winning_move(2)
+
+	if winning_move != -1:
+		return winning_move
+
+	return get_random_valid_column()
+
+func get_hard_move():
+	var winning_move = find_winning_move(2)
+
+	if winning_move != -1:
+		return winning_move
+
+	var blocking_move = find_winning_move(1)
+
+	if blocking_move != -1:
+		return blocking_move
+
+	return get_random_valid_column()
+
+func find_winning_move(player):
+	for col in range(COLS):
+		var row = find_empty_row(col)
+
+		if row == -1:
+			continue
+
+		board[row][col] = player
+		var wins = check_win(row, col)
+		board[row][col] = 0
+
+		if wins:
+			return col
+
+	return -1
 
 func check_win(row, col):
 	if count_direction(row, col, 0, 1) >= 4:
@@ -326,9 +447,6 @@ func switch_player():
 		current_player = 1
 
 	print("Player ", current_player, "'s turn")
-
-	play_turn_animation()
-
 
 func create_turn_label():
 	var curvey_font = load("res://Assets/Fonts/Font3.ttf")
@@ -440,6 +558,7 @@ func _on_reset_button_pressed():
 func play_turn_animation():
 	if turn_tween:
 		turn_tween.kill()
+	turn_label.visible = true
 
 	var screen_width = get_viewport_rect().size.x
 	var label_width = turn_label.size.x
@@ -465,7 +584,7 @@ func play_turn_animation():
 			70
 		)
 
-		turn_label.text = "PLAYER 1'S TURN"
+		turn_label.text = "YOUR TURN" if computer_mode else "PLAYER 1'S TURN"
 
 		turn_label.add_theme_color_override(
 			"font_color",
@@ -483,7 +602,7 @@ func play_turn_animation():
 			70
 		)
 
-		turn_label.text = "PLAYER 2'S TURN"
+		turn_label.text = "COMPUTER'S TURN" if computer_mode else "PLAYER 2'S TURN"
 
 		turn_label.add_theme_color_override(
 			"font_color",
@@ -509,12 +628,12 @@ func play_turn_animation():
 		exit_position,
 		0.5
 	).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
-
+	turn_tween.tween_callback(func(): turn_label.visible = false)
 
 func show_win_screen():
 	turn_label.visible = false
 
-	win_label.text = "PLAYER " + str(current_player) + " WINS!"
+	win_label.text = "YOU WIN!" if computer_mode and current_player == 1 else ("COMPUTER WINS!" if computer_mode else "PLAYER " + str(current_player) + " WINS!")
 
 	if current_player == 1:
 		win_label.add_theme_color_override(
@@ -780,19 +899,88 @@ func _start_game():
 func start_actual_game():
 	game_started = true
 	turn_label.visible = true
+	if computer_mode:
+		current_player = 1
+	game_started = true
+	turn_label.visible = true
+	if computer_mode and current_player == 2:
+		computer_take_turn()
 	play_turn_animation()
 	controls_label.visible = true
 
 func _on_rules_continue():
 	mark_rules_seen()
-	move_neon_snake_to(start_info_screen)
+	move_neon_snake_to(game_mode_screen)
 	rules_screen.visible = false
-	start_info_screen.visible = true
+	game_mode_screen.visible = true
 	click_sound.play()
+	
+func create_game_mode_screen():
+	game_mode_screen = Control.new()
+	var background = ColorRect.new()
+	background.color = MENU_BG
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	game_mode_screen.add_child(background)
+	game_mode_screen.name = "GameModeScreen"
+	game_mode_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	game_mode_screen.z_index = 110
+	game_mode_screen.visible = false
+	add_child(game_mode_screen)
+	
+	add_menu_stars(game_mode_screen)
+
+	var title = Label.new()
+	title.text = "GAME MODE"
+	title.position = Vector2(0, 170)
+	title.size = Vector2(1280, 80)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 52)
+	title.add_theme_color_override("font_color", Color("#00AFCF"))
+	game_mode_screen.add_child(title)
+
+	var computer_button = Button.new()
+	computer_button.text = "COMPUTER"
+	computer_button.position = Vector2(440, 300)
+	computer_button.size = Vector2(400, 80)
+	computer_button.add_theme_font_size_override("font_size", 28)
+	game_mode_screen.add_child(computer_button)
+
+	var two_player_button = Button.new()
+	two_player_button.text = "2 PLAYERS"
+	two_player_button.position = Vector2(440, 410)
+	two_player_button.size = Vector2(400, 80)
+	two_player_button.add_theme_font_size_override("font_size", 28)
+	game_mode_screen.add_child(two_player_button)
+
+	computer_button.pressed.connect(_on_computer_mode_pressed)
+	two_player_button.pressed.connect(_on_two_player_mode_pressed)
+	
+func _on_computer_mode_pressed():
+	click_sound.play()
+	computer_mode = true
+	computer_difficulty = ""
+
+	game_mode_screen.visible = false
+	difficulty_screen.visible = true
+
+	move_neon_snake_to(difficulty_screen)
+	
+func _on_two_player_mode_pressed():
+	click_sound.play()
+	computer_mode = false
+	game_mode_screen.visible = false
+	move_neon_snake_to(start_info_screen)
+	start_info_screen.visible = true
 
 func move_neon_snake_to(screen):
 	for node in [neon_trail_glow, neon_trail_line, neon_orb, neon_orb_core]:
 		node.reparent(screen, false)
+	neon_orb.position = Vector2.ZERO
+	neon_orb_core.position = Vector2(3, 3)
+	neon_trail.clear()
+	neon_trail_line.points = PackedVector2Array()
+	neon_trail_glow.points = PackedVector2Array()
 
 func create_rules_screen():
 	var curvey_font = load("res://Assets/Fonts/Font2.ttf")
@@ -803,6 +991,7 @@ func create_rules_screen():
 	rules_screen.z_index = 110
 	rules_screen.visible = false
 	add_child(rules_screen)
+	add_menu_stars(rules_screen)
 
 	var background = ColorRect.new()
 	background.color = Color("#080A10")
@@ -866,6 +1055,61 @@ func create_rules_screen():
 	rules_button.pressed.connect(_on_rules_continue)
 	rules_screen.add_child(rules_button)
 
+func create_difficulty_screen():
+	difficulty_screen = Control.new()
+	var background = ColorRect.new()
+	background.color = MENU_BG
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	difficulty_screen.add_child(background)
+	difficulty_screen.name = "DifficultyScreen"
+	difficulty_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	difficulty_screen.z_index = 110
+	difficulty_screen.visible = false
+	add_child(difficulty_screen)
+	add_menu_stars(difficulty_screen)
+
+	var title = Label.new()
+	title.text = "SELECT DIFFICULTY"
+	title.position = Vector2(0, 170)
+	title.size = Vector2(1280, 80)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 48)
+	title.add_theme_color_override("font_color", Color("#00AFCF"))
+	difficulty_screen.add_child(title)
+
+	var easy_button = Button.new()
+	easy_button.text = "EASY"
+	easy_button.position = Vector2(440, 285)
+	easy_button.size = Vector2(400, 70)
+	easy_button.add_theme_font_size_override("font_size", 26)
+	difficulty_screen.add_child(easy_button)
+
+	var medium_button = Button.new()
+	medium_button.text = "MEDIUM"
+	medium_button.position = Vector2(440, 380)
+	medium_button.size = Vector2(400, 70)
+	medium_button.add_theme_font_size_override("font_size", 26)
+	difficulty_screen.add_child(medium_button)
+
+	var hard_button = Button.new()
+	hard_button.text = "HARD"
+	hard_button.position = Vector2(440, 475)
+	hard_button.size = Vector2(400, 70)
+	hard_button.add_theme_font_size_override("font_size", 26)
+	difficulty_screen.add_child(hard_button)
+
+	easy_button.pressed.connect(_on_difficulty_selected.bind("Easy"))
+	medium_button.pressed.connect(_on_difficulty_selected.bind("Medium"))
+	hard_button.pressed.connect(_on_difficulty_selected.bind("Hard"))
+
+func _on_difficulty_selected(difficulty):
+	click_sound.play()
+	computer_difficulty = difficulty
+	difficulty_screen.visible = false
+	move_neon_snake_to(start_info_screen)
+	start_info_screen.visible = true
+
 func create_start_info_screen():
 	var curvey_font = load("res://Assets/Fonts/Font3.ttf")
 	start_info_screen = Control.new()
@@ -921,29 +1165,6 @@ func create_start_info_screen():
 	start_info_screen.add_child(start_info_button)
 	start_info_button.pressed.connect(_on_start_info_button_pressed)
 	
-	neon_orb = ColorRect.new()
-	neon_orb.size = Vector2(12, 12)
-	neon_orb.color = Color("#00E5FF")
-	neon_orb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	neon_orb_core = ColorRect.new()
-	neon_orb_core.size = Vector2(7, 7)
-	neon_orb_core.color = Color("#E6FCFF")
-	neon_orb_core.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	neon_orb_core.z_index = 106
-	start_screen.add_child(neon_orb_core)
-	neon_orb.z_index = 105
-	start_screen.add_child(neon_orb)
-	neon_trail_line = Line2D.new()
-	neon_trail_line.width = 18.0
-	neon_trail_line.default_color = Color(0.0, 0.8, 1.0, 0.65)
-	neon_trail_line.z_index = 104
-	start_screen.add_child(neon_trail_line)
-	neon_trail_glow = Line2D.new()
-	neon_trail_glow.width = 32.0
-	neon_trail_glow.default_color = Color(0.0, 0.8, 1.0, 0.16)
-	neon_trail_glow.z_index = 103
-	start_screen.add_child(neon_trail_glow)
-	
 	var stars = [
 	Vector2(70, 85), Vector2(210, 125),
 	Vector2(390, 70), Vector2(520, 105), Vector2(680, 65),
@@ -989,7 +1210,7 @@ func mark_rules_seen():
 	file.store_string("seen")
 
 func _process(delta):
-	if (start_screen and start_screen.visible) or (rules_screen and rules_screen.visible) or (start_info_screen and start_info_screen.visible):
+	if (start_screen and start_screen.visible) or (rules_screen and rules_screen.visible) or (game_mode_screen and game_mode_screen.visible) or (difficulty_screen and difficulty_screen.visible) or (start_info_screen and start_info_screen.visible):
 		neon_orb_position += delta * 1000.0
 	if neon_orb_position >= 4000.0:
 		neon_orb_position = 0.0
@@ -1037,8 +1258,18 @@ func _process(delta):
 	queue_redraw()
 
 func reset_game():
+	if computer_mode:
+		game_started = false
+		win_label.visible = false
+		reset_button.visible = false
+		difficulty_screen.visible = false
+		start_info_screen.visible = false
+		game_mode_screen.visible = true
+		move_neon_snake_to(game_mode_screen)
+		return
 	game_over = false
 	current_player = 1
+	computer_thinking = false
 	winning_discs = []
 	confetti.clear()
 	confetti_time = 0.0
@@ -1085,6 +1316,8 @@ func _input(event):
 
 
 func _draw():
+	if not game_started:
+		return
 	var screen_size = get_viewport_rect().size
 
 	draw_rect(
