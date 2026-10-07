@@ -56,10 +56,14 @@ var neon_trail: Array[Vector2] = []
 var neon_trail_line: Line2D
 var neon_trail_glow: Line2D
 var start_info_button: Button
+var menu_button: Button
 
 var shutter: Control
 var shutter_slats: Array[Panel] = []
 var shutter_tween: Tween
+
+var button_font: Font
+var title_font: Font
 
 var drop_sound: AudioStreamPlayer
 var win_sound: AudioStreamPlayer
@@ -67,6 +71,8 @@ var draw_sound: AudioStreamPlayer
 var click_sound: AudioStreamPlayer
 
 func _ready():
+	button_font = load("res://Assets/Fonts/Font3.ttf")
+	title_font = load("res://Assets/Fonts/Font2.ttf")
 	initialize_board()
 	create_turn_label()
 	create_win_ui()
@@ -160,7 +166,7 @@ func close_shutter():
 func _reveal_end_screen():
 	win_label.visible = true
 	reset_button.visible = true
-
+	menu_button.visible = true
 	win_label.scale = Vector2(0.2, 0.2)
 	win_label.modulate.a = 0.0
 
@@ -303,7 +309,12 @@ func computer_take_turn():
 
 func get_computer_move():
 	if computer_difficulty == "Easy":
-		return get_random_valid_column()
+		var blocking_move = find_winning_move(1)
+
+		if blocking_move != -1 and randi() % 2 == 0:
+			return blocking_move
+
+	return get_random_valid_column()
 
 	if computer_difficulty == "Medium":
 		return get_medium_move()
@@ -328,6 +339,11 @@ func get_medium_move():
 	if winning_move != -1:
 		return winning_move
 
+	var blocking_move = find_winning_move(1)
+
+	if blocking_move != -1:
+		return blocking_move
+
 	return get_random_valid_column()
 
 func get_hard_move():
@@ -341,7 +357,104 @@ func get_hard_move():
 	if blocking_move != -1:
 		return blocking_move
 
-	return get_random_valid_column()
+	return get_best_hard_move()
+
+func get_best_hard_move():
+	var best_score = -999999
+	var best_column = -1
+
+	for col in range(COLS):
+		var row = find_empty_row(col)
+
+		if row == -1:
+			continue
+
+		board[row][col] = 2
+		var score = evaluate_board()
+		board[row][col] = 0
+
+		if score > best_score:
+			best_score = score
+			best_column = col
+
+	return best_column
+
+func evaluate_board():
+	var score = 0
+
+	# Prefer the center column
+	var center_col = COLS / 2
+
+	for row in range(ROWS):
+		if board[row][center_col] == 2:
+			score += 3
+		elif board[row][center_col] == 1:
+			score -= 3
+
+	# Check every possible group of 4
+	for row in range(ROWS):
+		for col in range(COLS):
+			# Horizontal
+			if col + 3 < COLS:
+				score += evaluate_window([
+					board[row][col],
+					board[row][col + 1],
+					board[row][col + 2],
+					board[row][col + 3]
+				])
+
+			# Vertical
+			if row + 3 < ROWS:
+				score += evaluate_window([
+					board[row][col],
+					board[row + 1][col],
+					board[row + 2][col],
+					board[row + 3][col]
+				])
+
+			# Diagonal down-right
+			if row + 3 < ROWS and col + 3 < COLS:
+				score += evaluate_window([
+					board[row][col],
+					board[row + 1][col + 1],
+					board[row + 2][col + 2],
+					board[row + 3][col + 3]
+				])
+
+			# Diagonal up-right
+			if row - 3 >= 0 and col + 3 < COLS:
+				score += evaluate_window([
+					board[row][col],
+					board[row - 1][col + 1],
+					board[row - 2][col + 2],
+					board[row - 3][col + 3]
+				])
+
+	return score
+
+func evaluate_window(window):
+	var score = 0
+
+	var computer_count = window.count(2)
+	var player_count = window.count(1)
+	var empty_count = window.count(0)
+
+	if computer_count == 4:
+		score += 10000
+
+	elif computer_count == 3 and empty_count == 1:
+		score += 100
+
+	elif computer_count == 2 and empty_count == 2:
+		score += 10
+
+	elif player_count == 3 and empty_count == 1:
+		score -= 120
+
+	elif player_count == 2 and empty_count == 2:
+		score -= 10
+
+	return score
 
 func find_winning_move(player):
 	for col in range(COLS):
@@ -487,12 +600,13 @@ func create_win_ui():
 	win_label.name = "WinLabel"
 	win_label.text = ""
 	win_label.size = Vector2(500, 100)
-	win_label.position = Vector2(390, 235)
+	win_label.position = Vector2(380, 235)
 
 	win_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	win_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
-	win_label.add_theme_font_size_override("font_size", 58)
+	win_label.add_theme_font_size_override("font_size", 52)
+	win_label.add_theme_font_override("font", title_font)
 	win_label.add_theme_constant_override("outline_size", 10)
 	win_label.add_theme_color_override("font_outline_color", Color("#080A10"))
 	win_label.add_theme_constant_override("shadow_offset_x", 0)
@@ -509,7 +623,7 @@ func create_win_ui():
 	reset_button = Button.new()
 	reset_button.name = "ResetButton"
 	reset_button.text = "PLAY AGAIN"
-	reset_button.size = Vector2(240, 68)
+	reset_button.size = Vector2(220, 68)
 	var normal_style = StyleBoxFlat.new()
 	normal_style.bg_color = Color("#171A3A")
 	normal_style.border_color = Color("#00AFCF")
@@ -537,9 +651,10 @@ func create_win_ui():
 	reset_button.add_theme_stylebox_override("pressed", pressed_style)
 	normal_style.shadow_color = Color(0.0, 0.7, 1.0, 0.25)
 	normal_style.shadow_size = 8
-	reset_button.position = Vector2(530, 370)
+	reset_button.position = Vector2(480, 370)
 
 	reset_button.add_theme_font_size_override("font_size", 24)
+	reset_button.add_theme_font_override("font", button_font)
 	reset_button.add_theme_color_override("font_color", Color("#E8F1FF"))
 	reset_button.add_theme_color_override("font_hover_color", Color("#00D9FF"))
 	reset_button.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
@@ -550,6 +665,81 @@ func create_win_ui():
 	reset_button.pressed.connect(_on_reset_button_pressed)
 
 	add_child(reset_button)
+	
+	menu_button = Button.new()
+	menu_button.name = "MenuButton"
+	menu_button.text = "MENU"
+	menu_button.position = Vector2(520, 450)
+	menu_button.size = Vector2(240, 68)
+	menu_button.add_theme_font_size_override("font_size", 24)
+	menu_button.add_theme_font_override("font", button_font)
+	menu_button.visible = false
+	menu_button.z_index = 20
+	menu_button.add_theme_color_override("font_color", Color("#E8F1FF"))
+	menu_button.add_theme_color_override("font_hover_color", Color("#00D9FF"))
+	menu_button.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+	var menu_normal = StyleBoxFlat.new()
+	menu_normal.bg_color = Color("#171A3A")
+	menu_normal.border_color = Color("#00AFCF")
+	menu_normal.set_border_width_all(2)
+	menu_normal.set_corner_radius_all(12)
+	menu_normal.shadow_color = Color(0.0, 0.7, 1.0, 0.25)
+	menu_normal.shadow_size = 8
+
+	var menu_hover = StyleBoxFlat.new()
+	menu_hover.bg_color = Color("#202A4A")
+	menu_hover.border_color = Color("#00D9FF")
+	menu_hover.set_border_width_all(3)
+	menu_hover.set_corner_radius_all(12)
+	menu_hover.shadow_color = Color(0.0, 0.85, 1.0, 0.45)
+	menu_hover.shadow_size = 12
+
+	var menu_pressed = StyleBoxFlat.new()
+	menu_pressed.bg_color = Color("#0D1025")
+	menu_pressed.border_color = Color("#00D9FF")
+	menu_pressed.set_border_width_all(2)
+	menu_pressed.set_corner_radius_all(12)
+
+	menu_button.add_theme_stylebox_override("normal", menu_normal)
+	menu_button.add_theme_stylebox_override("hover", menu_hover)
+	menu_button.add_theme_stylebox_override("pressed", menu_pressed)
+	add_child(menu_button)
+	menu_button.pressed.connect(_on_menu_button_pressed)
+
+func _on_menu_button_pressed():
+	click_sound.play()
+	game_started = false
+	game_over = false
+
+	initialize_board()
+	current_player = 1
+	computer_thinking = false
+	is_animating = false
+	winning_discs = []
+	
+	turn_label.visible = false
+
+	if turn_tween:
+		turn_tween.kill()
+
+	if shutter_tween:
+		shutter_tween.kill()
+
+	shutter.visible = false
+	shutter.position.y = -480
+	
+	win_label.visible = false
+	
+	reset_button.visible = false
+	menu_button.visible = false
+	turn_label.visible = false
+	controls_label.visible = false
+
+	start_info_screen.visible = false
+	difficulty_screen.visible = false
+	game_mode_screen.visible = true
+
+	move_neon_snake_to(game_mode_screen)
 
 func _on_reset_button_pressed():
 	click_sound.play()
@@ -936,6 +1126,7 @@ func create_game_mode_screen():
 	title.size = Vector2(1280, 80)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 52)
+	title.add_theme_font_override("font", title_font)
 	title.add_theme_color_override("font_color", Color("#00AFCF"))
 	game_mode_screen.add_child(title)
 
@@ -944,6 +1135,27 @@ func create_game_mode_screen():
 	computer_button.position = Vector2(440, 300)
 	computer_button.size = Vector2(400, 80)
 	computer_button.add_theme_font_size_override("font_size", 28)
+	computer_button.add_theme_font_override("font", button_font)
+	var computer_normal = StyleBoxFlat.new()
+	computer_normal.bg_color = Color("#171A3A")
+	computer_normal.border_color = Color("#00AFCF")
+	computer_normal.set_border_width_all(2)
+	computer_normal.set_corner_radius_all(12)
+	computer_normal.shadow_color = Color(0.0, 0.7, 1.0, 0.25)
+	computer_normal.shadow_size = 8
+
+	var computer_hover = StyleBoxFlat.new()
+	computer_hover.bg_color = Color("#202A4A")
+	computer_hover.border_color = Color("#00D9FF")
+	computer_hover.set_border_width_all(3)
+	computer_hover.set_corner_radius_all(12)
+	computer_hover.shadow_color = Color(0.0, 0.85, 1.0, 0.45)
+	computer_hover.shadow_size = 12
+
+	computer_button.add_theme_stylebox_override("normal", computer_normal)
+	computer_button.add_theme_stylebox_override("hover", computer_hover)
+	computer_button.add_theme_color_override("font_color", Color("#E8F1FF"))
+	computer_button.add_theme_color_override("font_hover_color", Color("#00D9FF"))
 	game_mode_screen.add_child(computer_button)
 
 	var two_player_button = Button.new()
@@ -951,6 +1163,27 @@ func create_game_mode_screen():
 	two_player_button.position = Vector2(440, 410)
 	two_player_button.size = Vector2(400, 80)
 	two_player_button.add_theme_font_size_override("font_size", 28)
+	two_player_button.add_theme_font_override("font", button_font)
+	var two_normal = StyleBoxFlat.new()
+	two_normal.bg_color = Color("#171A3A")
+	two_normal.border_color = Color("#00AFCF")
+	two_normal.set_border_width_all(2)
+	two_normal.set_corner_radius_all(12)
+	two_normal.shadow_color = Color(0.0, 0.7, 1.0, 0.25)
+	two_normal.shadow_size = 8
+
+	var two_hover = StyleBoxFlat.new()
+	two_hover.bg_color = Color("#202A4A")
+	two_hover.border_color = Color("#00D9FF")
+	two_hover.set_border_width_all(3)
+	two_hover.set_corner_radius_all(12)
+	two_hover.shadow_color = Color(0.0, 0.85, 1.0, 0.45)
+	two_hover.shadow_size = 12
+
+	two_player_button.add_theme_stylebox_override("normal", two_normal)
+	two_player_button.add_theme_stylebox_override("hover", two_hover)
+	two_player_button.add_theme_color_override("font_color", Color("#E8F1FF"))
+	two_player_button.add_theme_color_override("font_hover_color", Color("#00D9FF"))
 	game_mode_screen.add_child(two_player_button)
 
 	computer_button.pressed.connect(_on_computer_mode_pressed)
@@ -1075,6 +1308,7 @@ func create_difficulty_screen():
 	title.size = Vector2(1280, 80)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 48)
+	title.add_theme_font_override("font", title_font)
 	title.add_theme_color_override("font_color", Color("#00AFCF"))
 	difficulty_screen.add_child(title)
 
@@ -1083,6 +1317,27 @@ func create_difficulty_screen():
 	easy_button.position = Vector2(440, 285)
 	easy_button.size = Vector2(400, 70)
 	easy_button.add_theme_font_size_override("font_size", 26)
+	easy_button.add_theme_font_override("font", button_font)
+	var easy_normal = StyleBoxFlat.new()
+	easy_normal.bg_color = Color("#171A3A")
+	easy_normal.border_color = Color("#00AFCF")
+	easy_normal.set_border_width_all(2)
+	easy_normal.set_corner_radius_all(12)
+	easy_normal.shadow_color = Color(0.0, 0.7, 1.0, 0.25)
+	easy_normal.shadow_size = 8
+
+	var easy_hover = StyleBoxFlat.new()
+	easy_hover.bg_color = Color("#202A4A")
+	easy_hover.border_color = Color("#00D9FF")
+	easy_hover.set_border_width_all(3)
+	easy_hover.set_corner_radius_all(12)
+	easy_hover.shadow_color = Color(0.0, 0.85, 1.0, 0.45)
+	easy_hover.shadow_size = 12
+
+	easy_button.add_theme_stylebox_override("normal", easy_normal)
+	easy_button.add_theme_stylebox_override("hover", easy_hover)
+	easy_button.add_theme_color_override("font_color", Color("#E8F1FF"))
+	easy_button.add_theme_color_override("font_hover_color", Color("#00D9FF"))
 	difficulty_screen.add_child(easy_button)
 
 	var medium_button = Button.new()
@@ -1090,6 +1345,27 @@ func create_difficulty_screen():
 	medium_button.position = Vector2(440, 380)
 	medium_button.size = Vector2(400, 70)
 	medium_button.add_theme_font_size_override("font_size", 26)
+	medium_button.add_theme_font_override("font", button_font)
+	var medium_normal = StyleBoxFlat.new()
+	medium_normal.bg_color = Color("#171A3A")
+	medium_normal.border_color = Color("#00AFCF")
+	medium_normal.set_border_width_all(2)
+	medium_normal.set_corner_radius_all(12)
+	medium_normal.shadow_color = Color(0.0, 0.7, 1.0, 0.25)
+	medium_normal.shadow_size = 8
+
+	var medium_hover = StyleBoxFlat.new()
+	medium_hover.bg_color = Color("#202A4A")
+	medium_hover.border_color = Color("#00D9FF")
+	medium_hover.set_border_width_all(3)
+	medium_hover.set_corner_radius_all(12)
+	medium_hover.shadow_color = Color(0.0, 0.85, 1.0, 0.45)
+	medium_hover.shadow_size = 12
+
+	medium_button.add_theme_stylebox_override("normal", medium_normal)
+	medium_button.add_theme_stylebox_override("hover", medium_hover)
+	medium_button.add_theme_color_override("font_color", Color("#E8F1FF"))
+	medium_button.add_theme_color_override("font_hover_color", Color("#00D9FF"))
 	difficulty_screen.add_child(medium_button)
 
 	var hard_button = Button.new()
@@ -1097,6 +1373,27 @@ func create_difficulty_screen():
 	hard_button.position = Vector2(440, 475)
 	hard_button.size = Vector2(400, 70)
 	hard_button.add_theme_font_size_override("font_size", 26)
+	hard_button.add_theme_font_override("font", button_font)
+	var hard_normal = StyleBoxFlat.new()
+	hard_normal.bg_color = Color("#171A3A")
+	hard_normal.border_color = Color("#00AFCF")
+	hard_normal.set_border_width_all(2)
+	hard_normal.set_corner_radius_all(12)
+	hard_normal.shadow_color = Color(0.0, 0.7, 1.0, 0.25)
+	hard_normal.shadow_size = 8
+
+	var hard_hover = StyleBoxFlat.new()
+	hard_hover.bg_color = Color("#202A4A")
+	hard_hover.border_color = Color("#00D9FF")
+	hard_hover.set_border_width_all(3)
+	hard_hover.set_corner_radius_all(12)
+	hard_hover.shadow_color = Color(0.0, 0.85, 1.0, 0.45)
+	hard_hover.shadow_size = 12
+
+	hard_button.add_theme_stylebox_override("normal", hard_normal)
+	hard_button.add_theme_stylebox_override("hover", hard_hover)
+	hard_button.add_theme_color_override("font_color", Color("#E8F1FF"))
+	hard_button.add_theme_color_override("font_hover_color", Color("#00D9FF"))
 	difficulty_screen.add_child(hard_button)
 
 	easy_button.pressed.connect(_on_difficulty_selected.bind("Easy"))
@@ -1286,6 +1583,7 @@ func reset_game():
 
 	win_label.visible = false
 	reset_button.visible = false
+	menu_button.visible = false
 	
 	shutter.visible = false
 	shutter.position.y = -480
